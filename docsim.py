@@ -1,6 +1,8 @@
 import os
 import spacy
-from PyPDF2 import PdfReader
+import io
+from pdfminer.high_level import extract_text_to_fp
+from pdfminer.layout import LAParams
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
@@ -8,17 +10,16 @@ import numpy as np
 nlp = spacy.load("de_core_news_md")
 
 def extract_text_from_pdf(pdf_path):
-    with open(pdf_path, 'rb') as file:
-        reader = PdfReader(file)
-        text = ''
-        for page in reader.pages:
-            text += page.extract_text()
-    return text
+    output_string = io.StringIO()
+    with open(pdf_path, 'rb') as fin:
+        extract_text_to_fp(fin, output_string, laparams=LAParams(), 
+                           output_type='text', codec='utf-8')
+    return output_string.getvalue()
 
 def preprocess_text(text):
     doc = nlp(text)
-    # Keep only nouns, proper nouns, verbs, and numbers and dates 
-    tokens = [token.lemma_.lower() for token in doc if token.pos_ in ['NOUN', 'PROPN', 'VERB', 'NUM','DATE']]
+    # Keep nouns, proper nouns, verbs, numbers, and dates
+    tokens = [token.lemma_.lower() for token in doc if token.pos_ in ['NOUN', 'PROPN', 'VERB', 'NUM'] or token.ent_type_ == 'DATE']
     return ' '.join(tokens)
 
 def load_invoices(directory):
@@ -51,8 +52,8 @@ def find_most_similar_invoice(input_invoice, database):
 
 # Main execution
 if __name__ == "__main__":
-    train_directory = os.getcwd()+'/train'
-    test_directory = os.getcwd()+'/test'
+    train_directory = 'train'
+    test_directory = 'test'
     
     # Load training invoices
     print("Loading and processing training invoices...")
